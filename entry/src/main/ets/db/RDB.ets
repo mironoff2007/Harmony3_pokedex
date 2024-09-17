@@ -1,7 +1,7 @@
 import relationalStore from '@ohos.data.relationalStore'
 import UIAbility from '@ohos.app.ability.UIAbility'
 
-let store: relationalStore.RdbStore;
+export let store: relationalStore.RdbStore;
 let config: relationalStore.StoreConfig = {
   name: 'userInfo.db',
   securityLevel: relationalStore.SecurityLevel.S1

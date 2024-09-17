@@ -1,5 +1,7 @@
 import backgroundTaskManager from '@ohos.resourceschedule.backgroundTaskManager';
 import { SplashConstants } from '../viewmodel/SplashConstants';
+import {store} from '../db/RDB'
+import relationalStore from '@ohos.data.relationalStore';
 
 export class SplashViewModel {
   constructor(storage: LocalStorage) {
@@ -62,6 +64,8 @@ export class SplashViewModel {
     }
 
     // Execute the time-consuming task.
+    await this.insert()
+    await this.get()
     await this.sleep(3000)
     try {
       let setResult = this.storage.set<boolean>(SplashConstants.SPLASH_END, true);
@@ -75,6 +79,46 @@ export class SplashViewModel {
 
     // After the time-consuming task is executed, call the API to cancel the transient task.
     this.cancelSuspendDelay();
+  }
+
+  async insert() {
+    // Use a transaction to insert data.
+    try {
+      store.beginTransaction();
+      let u8 = new Uint8Array([1, 2, 3]);
+      const valueBucket = { "name": "Tom", "age": 18, "salary": 100.5, "blobType": u8 };
+      let promise = store.insert("test", valueBucket);
+      await promise.then(() => {
+        store.commit();
+      })
+    } catch (err) {
+      if ((err instanceof Error)) {
+        console.error(`Transaction failed, err: ${err.message}`);
+      } else if (err instanceof String) {
+        console.error(`Transaction failed, err: ${err}`);
+      }
+      console.error(`Transaction failed, err: ${err}`);
+      store.rollBack();
+    }
+  }
+
+  async get() {
+    try {
+      let predicates = new relationalStore.RdbPredicates("test");
+      let promisequery = store.query(predicates);
+      await promisequery.then((resultSet) => {
+        resultSet.goToFirstRow();
+        const id = resultSet.getLong(resultSet.getColumnIndex("id"));
+        const name = resultSet.getString(resultSet.getColumnIndex("name"));
+        const age = resultSet.getLong(resultSet.getColumnIndex("age"));
+        const salary = resultSet.getDouble(resultSet.getColumnIndex("salary"));
+        const blobType = resultSet.getBlob(resultSet.getColumnIndex("blobType"));
+        resultSet.close();
+      })
+    }
+    catch (err) {
+      console.error(`err: ${err}`);
+    }
   }
 
   async sleep(msec: number): Promise<number> {
