@@ -2,6 +2,8 @@ import backgroundTaskManager from '@ohos.resourceschedule.backgroundTaskManager'
 import { SplashConstants } from '../viewmodel/SplashConstants';
 import {store} from '../db/RDB'
 import relationalStore from '@ohos.data.relationalStore';
+import { Pokemon } from '../model/Pokemon';
+import { POKE_TABLE } from '../db/PokeTable';
 
 export class SplashViewModel {
   constructor(storage: LocalStorage) {
@@ -64,8 +66,13 @@ export class SplashViewModel {
     }
 
     // Execute the time-consuming task.
+    await store.executeSql(POKE_TABLE.sqlCreate).catch(err => {
+      if (err) {
+        console.error(`create table error: ${err}`);
+      }
+    });
     await this.insert()
-    await this.get()
+    const poke = await this.get()
     await this.sleep(3000)
     try {
       let setResult = this.storage.set<boolean>(SplashConstants.SPLASH_END, true);
@@ -85,9 +92,8 @@ export class SplashViewModel {
     // Use a transaction to insert data.
     try {
       store.beginTransaction();
-      let u8 = new Uint8Array([1, 2, 3]);
-      const valueBucket = { "name": "Tom", "age": 18, "salary": 100.5, "blobType": u8 };
-      let promise = store.insert("test", valueBucket);
+      const poke: any = new Pokemon(1, "poke1", "pic1")
+      let promise = store.insert(POKE_TABLE.tableName, poke);
       await promise.then(() => {
         store.commit();
       })
@@ -102,22 +108,22 @@ export class SplashViewModel {
     }
   }
 
-  async get() {
+  async get(): Promise<Pokemon> {
     try {
-      let predicates = new relationalStore.RdbPredicates("test");
+      let predicates = new relationalStore.RdbPredicates(POKE_TABLE.tableName);
       let promisequery = store.query(predicates);
-      await promisequery.then((resultSet) => {
+      return await promisequery.then((resultSet) => {
         resultSet.goToFirstRow();
         const id = resultSet.getLong(resultSet.getColumnIndex("id"));
         const name = resultSet.getString(resultSet.getColumnIndex("name"));
-        const age = resultSet.getLong(resultSet.getColumnIndex("age"));
-        const salary = resultSet.getDouble(resultSet.getColumnIndex("salary"));
-        const blobType = resultSet.getBlob(resultSet.getColumnIndex("blobType"));
+        const picUrl = resultSet.getString(resultSet.getColumnIndex("picUrl"));
         resultSet.close();
+        return new Pokemon(id, name, picUrl)
       })
     }
     catch (err) {
       console.error(`err: ${err}`);
+      return null
     }
   }
 

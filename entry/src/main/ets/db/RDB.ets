@@ -2,8 +2,9 @@ import relationalStore from '@ohos.data.relationalStore'
 import UIAbility from '@ohos.app.ability.UIAbility'
 
 export let store: relationalStore.RdbStore;
+
 let config: relationalStore.StoreConfig = {
-  name: 'userInfo.db',
+  name: 'pokemon.db',
   securityLevel: relationalStore.SecurityLevel.S1
 }
 
