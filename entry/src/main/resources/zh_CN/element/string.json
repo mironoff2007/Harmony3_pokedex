@@ -11,6 +11,10 @@
     {
       "name": "EntryAbility_label",
       "value": "label"
+    },
+    {
+      "name": "internet_permission",
+      "value": "允许访问网络"
     }
   ]
 }
