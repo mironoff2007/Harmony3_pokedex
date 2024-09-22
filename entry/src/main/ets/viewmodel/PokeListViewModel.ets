@@ -1,9 +1,14 @@
 import backgroundTaskManager from '@ohos.resourceschedule.backgroundTaskManager';
-import { http } from '@kit.NetworkKit';
-import { RouteConstants } from '../pages/RouteConstants';
-import { SplashConstants } from '../viewmodel/SplashConstants';
+import http from '@ohos.net.http';
 
-export class SplashViewModel {
+import { SplashConstants } from '../viewmodel/SplashConstants';
+import { store } from '../db/RDB';
+import { POKE_TABLE } from '../db/PokeTable';
+import relationalStore from '@ohos.data.relationalStore';
+import { PokemonResponse } from '../model/PokemonResponse';
+import { generateBucket, Pokemon } from '../model/Pokemon';
+
+export class PokeListViewModel {
   constructor(storage: LocalStorage) {
     this.storage = storage
   }
@@ -12,8 +17,10 @@ export class SplashViewModel {
   id: number = 1; // ID of the suspension delay request.
   delayTime: number = 5000; // Remaining duration for the suspension delay request.
 
-  getCatalogueData() {
-    // Each HttpRequest corresponds to an HttpRequestTask object and cannot be reused.
+  callPokemonsFromServer() {
+    const p: Pokemon = {id:1,name:"name",url: "url"}
+    this.savePokemonsToDb([p])
+    /*// Each HttpRequest corresponds to an HttpRequestTask object and cannot be reused.
     let httpRequest = http.createHttp();
 
     // Subscribe to the HTTP response header, which is returned earlier than HttpRequest. You can subscribe to HTTP Response Header events based on service requirements.
@@ -30,6 +37,9 @@ export class SplashViewModel {
         // data.header contains the HTTP response header. Parse the content based on service requirements.
         console.info('header:' + JSON.stringify(data.header));
         console.info('cookies:' + data.cookies); // 8+
+        const json: string = data.result as string
+        const pokeArray: PokemonResponse = JSON.parse(json)
+        this.savePokemonsToDb(pokeArray.results)
       } else {
         console.info('error:' + JSON.stringify(err));
         // Call the destroy() method to release resources after the call is complete.
@@ -52,7 +62,7 @@ export class SplashViewModel {
         connectTimeout: 60000, // Optional. The default value is 60000, in ms.
         readTimeout: 60000, // Optional. The default value is 60000, in ms.
       }, callback
-    )
+    )*/
   }
 
   // Request a suspension delay.
@@ -93,7 +103,7 @@ export class SplashViewModel {
     backgroundTaskManager.cancelSuspendDelay(this.id);
   }
 
-  async performLongRunningTask() {
+  async savePokemonsToDb(pokemons: Pokemon[]) {
     // Before executing a time-consuming task, call the API to request a transient task to delay the suspension.
     this.requestSuspendDelay();
 
@@ -107,7 +117,18 @@ export class SplashViewModel {
     }
 
     // Execute the time-consuming task.
-    await this.sleep(3000)
+    //await this.insertAll(pokemons)
+    try {
+      let backets: Array<relationalStore.ValuesBucket> = pokemons.map(poke => {
+        return generateBucket(poke)
+      })
+      //this.insertAll(backets)
+      this.insert(backets[0])
+      this.get()
+    } catch (e) {
+      console.error(e)
+    }
+
     try {
       let setResult = this.storage.set<boolean>(SplashConstants.SPLASH_END, true);
       console.log("setResult-" + setResult);
@@ -115,12 +136,69 @@ export class SplashViewModel {
       console.error(e)
     }
 
-    console.log("Waiting done.");
-    //router.replaceUrl({ url: RouteConstants.POKE_LIST })
-
     // After the time-consuming task is executed, call the API to cancel the transient task.
     this.cancelSuspendDelay();
   }
+
+  async insert(pokemon:relationalStore.ValuesBucket) {
+    // Use a transaction to insert data.
+    try {
+      store.beginTransaction();
+      let promise = store.insert(POKE_TABLE.tableName, {name:"name",url: "url"});
+      await promise.then(() => {
+        store.commit();
+      })
+    } catch (err) {
+      if ((err instanceof Error)) {
+        console.error(`Transaction failed, err: ${err.message}`);
+      } else if (err instanceof String) {
+        console.error(`Transaction failed, err: ${err}`);
+      }
+      console.error(`Transaction failed, err: ${err}`);
+      store.rollBack();
+    }
+  }
+
+  async insertAll(pokemons : relationalStore.ValuesBucket[]) {
+    // Use a transaction to insert data.
+    try {
+      store.beginTransaction();
+      let promise = store.batchInsert(POKE_TABLE.tableName, pokemons)
+      await promise.then(() => {
+        store.commit();
+        this.get()
+      })
+    } catch (err) {
+      if ((err instanceof Error)) {
+        console.error(`Transaction failed, err: ${err.message}`);
+      } else if (err instanceof String) {
+        console.error(`Transaction failed, err: ${err}`);
+      }
+      console.error(`Transaction failed, err: ${err}`);
+      store.rollBack();
+    }
+  }
+
+  async get(): Promise<Pokemon> {
+    try {
+      const predicates = new relationalStore.RdbPredicates(POKE_TABLE.tableName);
+      const promisequery = store.query(predicates, POKE_TABLE.columns);
+      return await promisequery.then((resultSet) => {
+        const rows = resultSet.rowCount
+        resultSet.goToFirstRow();
+        const id = resultSet.getLong(resultSet.getColumnIndex("id"));
+        const name = resultSet.getString(resultSet.getColumnIndex("name"));
+        const url = resultSet.getString(resultSet.getColumnIndex("url"));
+        resultSet.close();
+        return { id, name, url }
+      })
+    }
+    catch (err) {
+      console.error(`err: ${err}`);
+      return null
+    }
+  }
+
 
   async sleep(msec: number): Promise<number> {
     return new Promise<number>(resolve => setTimeout(resolve, msec));

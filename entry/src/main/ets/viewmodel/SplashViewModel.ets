@@ -1,9 +1,5 @@
 import backgroundTaskManager from '@ohos.resourceschedule.backgroundTaskManager';
 import { SplashConstants } from '../viewmodel/SplashConstants';
-import {store} from '../db/RDB'
-import relationalStore from '@ohos.data.relationalStore';
-import { Pokemon } from '../model/Pokemon';
-import { POKE_TABLE } from '../db/PokeTable';
 
 export class SplashViewModel {
   constructor(storage: LocalStorage) {
@@ -66,14 +62,7 @@ export class SplashViewModel {
     }
 
     // Execute the time-consuming task.
-    await store.executeSql(POKE_TABLE.sqlCreate).catch(err => {
-      if (err) {
-        console.error(`create table error: ${err}`);
-      }
-    });
-    await this.insert()
-    const poke = await this.get()
-    await this.sleep(3000)
+    await this.sleep(2000)
     try {
       let setResult = this.storage.set<boolean>(SplashConstants.SPLASH_END, true);
       console.log("setResult-" + setResult);
@@ -88,44 +77,6 @@ export class SplashViewModel {
     this.cancelSuspendDelay();
   }
 
-  async insert() {
-    // Use a transaction to insert data.
-    try {
-      store.beginTransaction();
-      const poke: any = new Pokemon(1, "poke1", "pic1")
-      let promise = store.insert(POKE_TABLE.tableName, poke);
-      await promise.then(() => {
-        store.commit();
-      })
-    } catch (err) {
-      if ((err instanceof Error)) {
-        console.error(`Transaction failed, err: ${err.message}`);
-      } else if (err instanceof String) {
-        console.error(`Transaction failed, err: ${err}`);
-      }
-      console.error(`Transaction failed, err: ${err}`);
-      store.rollBack();
-    }
-  }
-
-  async get(): Promise<Pokemon> {
-    try {
-      let predicates = new relationalStore.RdbPredicates(POKE_TABLE.tableName);
-      let promisequery = store.query(predicates);
-      return await promisequery.then((resultSet) => {
-        resultSet.goToFirstRow();
-        const id = resultSet.getLong(resultSet.getColumnIndex("id"));
-        const name = resultSet.getString(resultSet.getColumnIndex("name"));
-        const picUrl = resultSet.getString(resultSet.getColumnIndex("picUrl"));
-        resultSet.close();
-        return new Pokemon(id, name, picUrl)
-      })
-    }
-    catch (err) {
-      console.error(`err: ${err}`);
-      return null
-    }
-  }
 
   async sleep(msec: number): Promise<number> {
     return new Promise<number>(resolve => setTimeout(resolve, msec));
