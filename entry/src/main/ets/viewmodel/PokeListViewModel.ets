@@ -7,6 +7,8 @@ import { POKE_TABLE } from '../db/PokeTable';
 import relationalStore from '@ohos.data.relationalStore';
 import { generateBucket, Pokemon } from '../model/Pokemon';
 import { PokemonResponse } from '../model/PokemonResponse';
+import List from '@ohos.util.List';
+import ArrayList from '@ohos.util.ArrayList';
 
 export class PokeListViewModel {
   constructor(storage: LocalStorage) {
@@ -163,7 +165,6 @@ export class PokeListViewModel {
       let promise = store.insert(POKE_TABLE.tableName,poke);
       await promise.then(() => {
         store.commit();
-        store.sync()
       })
     } catch (err) {
       if ((err instanceof Error)) {
@@ -206,19 +207,23 @@ export class PokeListViewModel {
     )
   }
 
-  async get(): Promise<Pokemon> {
+  async get(): Promise<ArrayList<Pokemon>> {
     try {
       await this.count()
       const predicates = new relationalStore.RdbPredicates(POKE_TABLE.tableName);
       const promisequery = store.query(predicates, POKE_TABLE.columns);
+      const pokemons = new ArrayList<Pokemon>()
       return await promisequery.then((resultSet) => {
-        const rows = resultSet.rowCount
         resultSet.goToFirstRow();
-        const id = resultSet.getLong(resultSet.getColumnIndex("id"));
-        const name = resultSet.getString(resultSet.getColumnIndex("name"));
-        const url = resultSet.getString(resultSet.getColumnIndex("url"));
+        while (!resultSet.isAtLastRow) {
+          resultSet.goToNextRow()
+          const id = resultSet.getLong(resultSet.getColumnIndex("id"));
+          const name = resultSet.getString(resultSet.getColumnIndex("name"));
+          const url = resultSet.getString(resultSet.getColumnIndex("url"));
+          pokemons.add({ id, name, url })
+        }
         resultSet.close();
-        return { id, name, url }
+        return pokemons;
       })
     }
     catch (err) {
