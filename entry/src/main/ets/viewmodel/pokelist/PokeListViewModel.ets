@@ -1,14 +1,15 @@
 import backgroundTaskManager from '@ohos.resourceschedule.backgroundTaskManager';
 import http from '@ohos.net.http';
 
-import { SplashConstants } from '../viewmodel/SplashConstants';
-import { store } from '../db/RDB';
-import { POKE_TABLE } from '../db/PokeTable';
+import { SplashConstants } from '../SplashConstants';
+import { store } from '../../db/RDB';
+import { POKE_TABLE } from '../../db/PokeTable';
 import relationalStore from '@ohos.data.relationalStore';
-import { generateBucket, Pokemon } from '../model/Pokemon';
-import { PokemonResponse } from '../model/PokemonResponse';
+import { generateBucket, Pokemon } from '../../model/Pokemon';
+import { PokemonResponse } from '../../model/PokemonResponse';
 import List from '@ohos.util.List';
 import ArrayList from '@ohos.util.ArrayList';
+import { ViewState } from '../../common/State';
 
 export class PokeListViewModel {
   constructor(storage: LocalStorage) {
@@ -20,6 +21,7 @@ export class PokeListViewModel {
   delayTime: number = 5000; // Remaining duration for the suspension delay request.
 
   async getPokemons() {
+    this.setLoading()
     // Before executing a time-consuming task, call the API to request a transient task to delay the suspension.
     this.requestSuspendDelay();
 
@@ -42,6 +44,15 @@ export class PokeListViewModel {
 
     // After the time-consuming task is executed, call the API to cancel the transient task.
     this.cancelSuspendDelay();
+  }
+
+  private setLoading() {
+    try {
+      const setResult = this.storage.set<ViewState<ArrayList<Pokemon>>>("pokeListState",ViewState.loading);
+      console.log("setResult-" + setResult);
+    } catch (e) {
+      console.error(e)
+    }
   }
 
   private callPokemonsFromServer() {
@@ -148,7 +159,13 @@ export class PokeListViewModel {
         return generateBucket(poke)
       })
       await this.insertAll(backets)
-      this.get()
+      const pokeList = await this.get()
+      try {
+        const setResult = this.storage.set<ViewState<ArrayList<Pokemon>>>("pokeListState",ViewState.content(pokeList));
+        console.log("setResult-" + setResult);
+      } catch (e) {
+        console.error(e)
+      }
     } catch (e) {
       console.error(e)
     }

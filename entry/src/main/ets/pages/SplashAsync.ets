@@ -17,8 +17,8 @@ struct SplashAsync {
   splashEnd: boolean = false;
 
   // @Watch callback
-  onSplashEnd(splashEnd: boolean): void {
-    if (splashEnd) {
+  onSplashEnd(): void {
+    if (this.splashEnd) {
       console.info('splashEnd');
       router.replaceUrl({ url: RouteConstants.POKE_LIST })
     }
