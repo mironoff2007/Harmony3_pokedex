@@ -33,7 +33,7 @@ struct PokeListPage {
     .width('100%')
     .onAppear(() => {
       console.log('on appear')
-      pokeListViewModel.callPokemonsFromServer()
+      pokeListViewModel.getPokemons()
     })
   }
 }

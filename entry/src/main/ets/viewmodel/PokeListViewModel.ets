@@ -5,8 +5,8 @@ import { SplashConstants } from '../viewmodel/SplashConstants';
 import { store } from '../db/RDB';
 import { POKE_TABLE } from '../db/PokeTable';
 import relationalStore from '@ohos.data.relationalStore';
-import { PokemonResponse } from '../model/PokemonResponse';
 import { generateBucket, Pokemon } from '../model/Pokemon';
+import { PokemonResponse } from '../model/PokemonResponse';
 
 export class PokeListViewModel {
   constructor(storage: LocalStorage) {
@@ -17,10 +17,33 @@ export class PokeListViewModel {
   id: number = 1; // ID of the suspension delay request.
   delayTime: number = 5000; // Remaining duration for the suspension delay request.
 
-  callPokemonsFromServer() {
-    const p: Pokemon = {id:1,name:"name",url: "url"}
-    this.savePokemonsToDb([p])
-    /*// Each HttpRequest corresponds to an HttpRequestTask object and cannot be reused.
+  async getPokemons() {
+    // Before executing a time-consuming task, call the API to request a transient task to delay the suspension.
+    this.requestSuspendDelay();
+
+    // If required, obtain the available time quota through the getRemainingDelayTime() API.
+    await this.getRemainingDelayTime();
+
+    if (this.delayTime < 0) { // If the time is less than a certain value, cancel the time-consuming task.
+      // Handle the scenario where the time quota is insufficient.
+      this.cancelSuspendDelay();
+      return;
+    }
+
+    if(await this.count() > 1000) {
+      this.get()
+    } else {
+      this.callPokemonsFromServer()
+    }
+    // Execute the time-consuming task.
+
+
+    // After the time-consuming task is executed, call the API to cancel the transient task.
+    this.cancelSuspendDelay();
+  }
+
+  private callPokemonsFromServer() {
+   // Each HttpRequest corresponds to an HttpRequestTask object and cannot be reused.
     let httpRequest = http.createHttp();
 
     // Subscribe to the HTTP response header, which is returned earlier than HttpRequest. You can subscribe to HTTP Response Header events based on service requirements.
@@ -29,7 +52,7 @@ export class PokeListViewModel {
       console.info('header: ' + JSON.stringify(header));
     });
 
-    let callback =(err: Error, data: http.HttpResponse)  => {
+    let callback = async (err: Error, data: http.HttpResponse)  => {
       if (!err) {
         // data.result contains the HTTP response. Parse the response based on service requirements.
         console.info('Result:' + data.result);
@@ -39,7 +62,8 @@ export class PokeListViewModel {
         console.info('cookies:' + data.cookies); // 8+
         const json: string = data.result as string
         const pokeArray: PokemonResponse = JSON.parse(json)
-        this.savePokemonsToDb(pokeArray.results)
+        await this.savePokemonsToDb(pokeArray.results)
+        await this.get()
       } else {
         console.info('error:' + JSON.stringify(err));
         // Call the destroy() method to release resources after the call is complete.
@@ -62,7 +86,7 @@ export class PokeListViewModel {
         connectTimeout: 60000, // Optional. The default value is 60000, in ms.
         readTimeout: 60000, // Optional. The default value is 60000, in ms.
       }, callback
-    )*/
+    )
   }
 
   // Request a suspension delay.
@@ -117,21 +141,12 @@ export class PokeListViewModel {
     }
 
     // Execute the time-consuming task.
-    //await this.insertAll(pokemons)
     try {
       let backets: Array<relationalStore.ValuesBucket> = pokemons.map(poke => {
         return generateBucket(poke)
       })
-      //this.insertAll(backets)
-      this.insert(backets[0])
+      await this.insertAll(backets)
       this.get()
-    } catch (e) {
-      console.error(e)
-    }
-
-    try {
-      let setResult = this.storage.set<boolean>(SplashConstants.SPLASH_END, true);
-      console.log("setResult-" + setResult);
     } catch (e) {
       console.error(e)
     }
@@ -140,13 +155,15 @@ export class PokeListViewModel {
     this.cancelSuspendDelay();
   }
 
-  async insert(pokemon:relationalStore.ValuesBucket) {
+  async insert() {
     // Use a transaction to insert data.
     try {
       store.beginTransaction();
-      let promise = store.insert(POKE_TABLE.tableName, {name:"name",url: "url"});
+      const poke: any = {id:1, name:"poke1", url:"pic1"}
+      let promise = store.insert(POKE_TABLE.tableName,poke);
       await promise.then(() => {
         store.commit();
+        store.sync()
       })
     } catch (err) {
       if ((err instanceof Error)) {
@@ -166,7 +183,6 @@ export class PokeListViewModel {
       let promise = store.batchInsert(POKE_TABLE.tableName, pokemons)
       await promise.then(() => {
         store.commit();
-        this.get()
       })
     } catch (err) {
       if ((err instanceof Error)) {
@@ -179,8 +195,20 @@ export class PokeListViewModel {
     }
   }
 
+  async count(): Promise<number> {
+    const q = 'SELECT COUNT(*) FROM ' + POKE_TABLE.tableName
+    return await store.querySql(q, []).then((resultSet) => {
+      resultSet.goToFirstRow();
+      const count = resultSet.getLong(0);
+      console.info("poke count-" + count)
+      return count
+    }
+    )
+  }
+
   async get(): Promise<Pokemon> {
     try {
+      await this.count()
       const predicates = new relationalStore.RdbPredicates(POKE_TABLE.tableName);
       const promisequery = store.query(predicates, POKE_TABLE.columns);
       return await promisequery.then((resultSet) => {

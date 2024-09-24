@@ -1,4 +1,6 @@
 import backgroundTaskManager from '@ohos.resourceschedule.backgroundTaskManager';
+import { POKE_TABLE } from '../db/PokeTable';
+import { store } from '../db/RDB';
 import { SplashConstants } from '../viewmodel/SplashConstants';
 
 export class SplashViewModel {
@@ -62,6 +64,11 @@ export class SplashViewModel {
     }
 
     // Execute the time-consuming task.
+    await store.executeSql(POKE_TABLE.sqlCreate).catch(err => {
+      if (err) {
+        console.error(`create table error: ${err}`);
+      }
+    });
     await this.sleep(2000)
     try {
       let setResult = this.storage.set<boolean>(SplashConstants.SPLASH_END, true);
