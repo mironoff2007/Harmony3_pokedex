@@ -57,7 +57,7 @@ export class PokeListViewModel {
 
   private callPokemonsFromServer() {
    // Each HttpRequest corresponds to an HttpRequestTask object and cannot be reused.
-    let httpRequest = http.createHttp();
+    const httpRequest = http.createHttp();
 
     // Subscribe to the HTTP response header, which is returned earlier than HttpRequest. You can subscribe to HTTP Response Header events based on service requirements.
     // on('headerReceive', AsyncCallback) will be replaced by on('headersReceive', Callback) in API version 8. 8+
@@ -65,7 +65,7 @@ export class PokeListViewModel {
       console.info('header: ' + JSON.stringify(header));
     });
 
-    let callback = async (err: Error, data: http.HttpResponse)  => {
+    const callback = async (err: Error, data: http.HttpResponse)  => {
       if (!err) {
         // data.result contains the HTTP response. Parse the response based on service requirements.
         console.info('Result:' + data.result);
@@ -104,10 +104,10 @@ export class PokeListViewModel {
 
   // Request a suspension delay.
   private requestSuspendDelay() {
-    let myReason = 'test requestSuspendDelay'; // Reason for the suspension delay request.
+    const myReason = 'test requestSuspendDelay'; // Reason for the suspension delay request.
 
     try {
-      let delayInfo = backgroundTaskManager.requestSuspendDelay(myReason, () => {
+      const delayInfo = backgroundTaskManager.requestSuspendDelay(myReason, () => {
         // The callback is invoked to notify the application that the suspension delay request is about to time out. The application needs to perform some cleanup and annotation operations and cancels the transient task.
         console.info("[backgroundTaskManager] Request suspension delay will time out.");
         backgroundTaskManager.cancelSuspendDelay(this.id);
@@ -155,7 +155,7 @@ export class PokeListViewModel {
 
     // Execute the time-consuming task.
     try {
-      let backets: Array<relationalStore.ValuesBucket> = pokemons.map(poke => {
+      const backets: Array<relationalStore.ValuesBucket> = pokemons.map(poke => {
         return generateBucket(poke)
       })
       await this.insertAll(backets)
@@ -179,7 +179,7 @@ export class PokeListViewModel {
     try {
       store.beginTransaction();
       const poke: any = {id:1, name:"poke1", url:"pic1"}
-      let promise = store.insert(POKE_TABLE.tableName,poke);
+      const promise = store.insert(POKE_TABLE.tableName,poke);
       await promise.then(() => {
         store.commit();
       })

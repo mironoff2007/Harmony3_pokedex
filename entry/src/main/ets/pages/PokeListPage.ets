@@ -4,7 +4,7 @@ import { PokeListViewModel } from '../viewmodel/pokelist/PokeListViewModel';
 import Curves from '@ohos.curves'
 
 let storage: LocalStorage = new LocalStorage();
-let pokeListViewModel: PokeListViewModel = new PokeListViewModel(storage)
+const pokeListViewModel: PokeListViewModel = new PokeListViewModel(storage)
 
 @Entry(storage)
 @Component

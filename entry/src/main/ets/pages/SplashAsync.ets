@@ -4,8 +4,8 @@ import { SplashViewModel } from '../viewmodel/SplashViewModel';
 import { SplashConstants } from '../viewmodel/SplashConstants';
 
 //let para: Record<string,boolean> = { 'splashEnd' : false };
-let storage: LocalStorage = new LocalStorage();
-let splashViewModel: SplashViewModel = new SplashViewModel(storage)
+const storage: LocalStorage = new LocalStorage();
+const splashViewModel: SplashViewModel = new SplashViewModel(storage)
 
 @Entry(storage)
 @Component

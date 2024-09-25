@@ -14,10 +14,10 @@ export class SplashViewModel {
 
   // Request a suspension delay.
   private requestSuspendDelay() {
-    let myReason = 'test requestSuspendDelay'; // Reason for the suspension delay request.
+    const myReason = 'test requestSuspendDelay'; // Reason for the suspension delay request.
 
     try {
-      let delayInfo = backgroundTaskManager.requestSuspendDelay(myReason, () => {
+      const delayInfo = backgroundTaskManager.requestSuspendDelay(myReason, () => {
         // The callback is invoked to notify the application that the suspension delay request is about to time out. The application needs to perform some cleanup and annotation operations and cancels the transient task.
         console.info("[backgroundTaskManager] Request suspension delay will time out.");
         backgroundTaskManager.cancelSuspendDelay(this.id);
@@ -71,7 +71,7 @@ export class SplashViewModel {
     });
     await this.sleep(2000)
     try {
-      let setResult = this.storage.set<boolean>(SplashConstants.SPLASH_END, true);
+      const setResult = this.storage.set<boolean>(SplashConstants.SPLASH_END, true);
       console.log("setResult-" + setResult);
     } catch (e) {
       console.error(e)
