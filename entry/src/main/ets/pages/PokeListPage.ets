@@ -2,6 +2,7 @@ import ArrayList from '@ohos.util.ArrayList';
 import { ViewState } from '../common/State';
 import { Pokemon } from '../model/Pokemon';
 import { PokeListViewModel } from '../viewmodel/pokelist/PokeListViewModel';
+import Curves from '@ohos.curves'
 
 let storage: LocalStorage = new LocalStorage();
 let pokeListViewModel: PokeListViewModel = new PokeListViewModel(storage)
@@ -10,9 +11,16 @@ let pokeListViewModel: PokeListViewModel = new PokeListViewModel(storage)
 @Component
 struct PokeListPage {
   @State message: string = 'PokeListPage';
+  @State progressVal: number = 0;
+  @State isLoading: boolean = true;
+  @State intervalLoading: number = -1;
+
   @LocalStorageProp('pokeListState')
   @Watch('onStateChange')
-  state: ViewState<ArrayList<Pokemon>> = ViewState.initial;
+  state: ViewState<ArrayList<Pokemon>> = ViewState.loading;
+
+  @State private progress: number = 0
+  private curve1 = Curves.cubicBezier(0.4, 0, 1, 1)
 
   // @Watch callback
   onStateChange(): void {
@@ -23,9 +31,21 @@ struct PokeListPage {
     }
   }
 
+  aboutToAppear() {
+    pokeListViewModel.getPokemons()
+    this.intervalLoading = setInterval(() => {
+      this.progressVal = this.progressVal >= 100 ?
+        0 : (this.progressVal + 5);
+    }, 50);
+  }
+
   build() {
     if (ViewState.isLoading(this.state)) {
-      Progress({ value: 10, type: ProgressType.ScaleRing }).width(100)
+      Stack({ alignContent: Alignment.Center }) {
+        Progress({ value: 0, total: 100, type: ProgressType.Ring })
+          .width(100)
+          .value(this.progressVal)
+      }.width('100%').height('100%')
     } else if (ViewState.isContent(this.state)) {
       Column() {
         Text(this.message)
@@ -50,11 +70,7 @@ struct PokeListPage {
       .height('100%')
       .width('100%')
     } else {
-      Progress({ value: 10, type: ProgressType.ScaleRing }).width(100)
-        .onAppear(() => {
-          console.log('on appear')
-          pokeListViewModel.getPokemons()
-        })
+
     }
   }
 }
