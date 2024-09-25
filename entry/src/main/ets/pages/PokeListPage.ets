@@ -18,9 +18,6 @@ struct PokeListPage {
   @Watch('onStateChange')
   state: ViewState<Array<Pokemon>> = ViewState.loading;
 
-  @State private progress: number = 0
-  private curve1 = Curves.cubicBezier(0.4, 0, 1, 1)
-
   // @Watch callback
   onStateChange(): void {
     if (ViewState.isLoading(this.state)) {
@@ -64,6 +61,10 @@ struct PokeListPage {
       }
       .height('100%')
       .width('100%')
+    } else if (ViewState.isError(this.state)) {
+      Stack({ alignContent: Alignment.Center }) {
+        Text("Error-" + this.state.err)
+      }.width('100%').height('100%')
     } else {
 
     }

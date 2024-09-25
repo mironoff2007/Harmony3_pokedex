@@ -16,6 +16,7 @@ export class PokeListViewModel {
     this.storage = storage
   }
 
+  LOG_TAG: string = "PokeListViewModel-"
   storage: LocalStorage
   id: number = 1; // ID of the suspension delay request.
   delayTime: number = 5000; // Remaining duration for the suspension delay request.
@@ -34,16 +35,36 @@ export class PokeListViewModel {
       return;
     }
 
-    if(await this.count() > 1000) {
-      this.get()
+    if (await this.count() > 1000) {
+      console.info(this.LOG_TAG + "load from db")
+      this.get().then((pokeList) => {
+        this.setContent(pokeList)
+      })
     } else {
+      console.info(this.LOG_TAG + "load from server")
       this.callPokemonsFromServer()
     }
-    // Execute the time-consuming task.
-
 
     // After the time-consuming task is executed, call the API to cancel the transient task.
     this.cancelSuspendDelay();
+  }
+
+  private setContent(c) {
+    try {
+      const setResult = this.storage.set<ViewState<ArrayList<Pokemon>>>("pokeListState",ViewState.content(c));
+      console.log("setResult-" + setResult);
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  private setError(e) {
+    try {
+      const setResult = this.storage.set<ViewState<ArrayList<Pokemon>>>("pokeListState",ViewState.error(e));
+      console.log("setResult-" + setResult);
+    } catch (e) {
+      console.error(e)
+    }
   }
 
   private setLoading() {
@@ -78,6 +99,7 @@ export class PokeListViewModel {
         await this.savePokemonsToDb(pokeArray.results)
         await this.get()
       } else {
+        this.setError(err)
         console.info('error:' + JSON.stringify(err));
         // Call the destroy() method to release resources after the call is complete.
         httpRequest.destroy();
@@ -114,6 +136,7 @@ export class PokeListViewModel {
       })
       this.id = delayInfo.requestId;
       this.delayTime = delayInfo.actualDelayTime;
+
       console.info("[backgroundTaskManager] The requestId is: " + this.id);
       console.info("[backgroundTaskManager]The actualDelayTime is: " + this.delayTime);
     } catch (error) {
@@ -160,38 +183,14 @@ export class PokeListViewModel {
       })
       await this.insertAll(backets)
       const pokeList = await this.get()
-      try {
-        const setResult = this.storage.set<ViewState<ArrayList<Pokemon>>>("pokeListState",ViewState.content(pokeList));
-        console.log("setResult-" + setResult);
-      } catch (e) {
-        console.error(e)
-      }
+      this.setContent(pokeList)
     } catch (e) {
+      this.setError(e)
       console.error(e)
     }
 
     // After the time-consuming task is executed, call the API to cancel the transient task.
     this.cancelSuspendDelay();
-  }
-
-  async insert() {
-    // Use a transaction to insert data.
-    try {
-      store.beginTransaction();
-      const poke: any = {id:1, name:"poke1", url:"pic1"}
-      const promise = store.insert(POKE_TABLE.tableName,poke);
-      await promise.then(() => {
-        store.commit();
-      })
-    } catch (err) {
-      if ((err instanceof Error)) {
-        console.error(`Transaction failed, err: ${err.message}`);
-      } else if (err instanceof String) {
-        console.error(`Transaction failed, err: ${err}`);
-      }
-      console.error(`Transaction failed, err: ${err}`);
-      store.rollBack();
-    }
   }
 
   async insertAll(pokemons : relationalStore.ValuesBucket[]) {
@@ -203,6 +202,7 @@ export class PokeListViewModel {
         store.commit();
       })
     } catch (err) {
+      this.setError(err)
       if ((err instanceof Error)) {
         console.error(`Transaction failed, err: ${err.message}`);
       } else if (err instanceof String) {
@@ -218,7 +218,7 @@ export class PokeListViewModel {
     return await store.querySql(q, []).then((resultSet) => {
       resultSet.goToFirstRow();
       const count = resultSet.getLong(0);
-      console.info("poke count-" + count)
+      console.info(this.LOG_TAG + "poke count-" + count)
       return count
     }
     )
@@ -226,6 +226,7 @@ export class PokeListViewModel {
 
   async get(): Promise<ArrayList<Pokemon>> {
     try {
+      console.info(this.LOG_TAG + "get")
       await this.count()
       const predicates = new relationalStore.RdbPredicates(POKE_TABLE.tableName);
       const promisequery = store.query(predicates, POKE_TABLE.columns);
@@ -244,7 +245,8 @@ export class PokeListViewModel {
       })
     }
     catch (err) {
-      console.error(`err: ${err}`);
+      this.setError(err)
+      console.error(this.LOG_TAG + `error get: ${err}`);
       return null
     }
   }
