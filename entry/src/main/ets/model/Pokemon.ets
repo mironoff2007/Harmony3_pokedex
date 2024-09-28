@@ -1,7 +1,7 @@
 import { POKE_TABLE } from '../db/PokeTable';
 import relationalStore from '@ohos.data.relationalStore'
 
-export class Pokemon  {
+export class Pokemon {
   id: number;
   name: string;
   url: string;
