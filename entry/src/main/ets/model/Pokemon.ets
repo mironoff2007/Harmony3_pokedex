@@ -5,6 +5,7 @@ export class Pokemon {
   id: number;
   name: string;
   url: string;
+  picUrl: string;
 }
 
 export function generateBucket(poke: Pokemon): relationalStore.ValuesBucket {

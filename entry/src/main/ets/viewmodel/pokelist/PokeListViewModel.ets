@@ -1,15 +1,14 @@
 import backgroundTaskManager from '@ohos.resourceschedule.backgroundTaskManager';
 import http from '@ohos.net.http';
 
-import { SplashConstants } from '../SplashConstants';
 import { store } from '../../db/RDB';
 import { POKE_TABLE } from '../../db/PokeTable';
 import relationalStore from '@ohos.data.relationalStore';
 import { generateBucket, Pokemon } from '../../model/Pokemon';
 import { PokemonResponse } from '../../model/PokemonResponse';
-import List from '@ohos.util.List';
 import ArrayList from '@ohos.util.ArrayList';
 import { ViewState } from '../../common/State';
+import { PokeInfo, PokemonInfoResponse } from '../../model/PokemonInfoResponse';
 
 export class PokeListViewModel {
   constructor(storage: LocalStorage) {
@@ -35,9 +34,9 @@ export class PokeListViewModel {
       return;
     }
 
-    if (await this.count() > 1000) {
+    if (await this.count() != 0) {
       console.info(this.LOG_TAG + "load from db")
-      this.get().then((pokeList) => {
+      this.getAll().then((pokeList) => {
         this.setContent(pokeList)
       })
     } else {
@@ -49,35 +48,8 @@ export class PokeListViewModel {
     this.cancelSuspendDelay();
   }
 
-  private setContent(c) {
-    try {
-      const setResult = this.storage.set<ViewState<ArrayList<Pokemon>>>("pokeListState",ViewState.content(c));
-      console.log("setResult-" + setResult);
-    } catch (e) {
-      console.error(e)
-    }
-  }
-
-  private setError(e) {
-    try {
-      const setResult = this.storage.set<ViewState<ArrayList<Pokemon>>>("pokeListState",ViewState.error(e));
-      console.log("setResult-" + setResult);
-    } catch (e) {
-      console.error(e)
-    }
-  }
-
-  private setLoading() {
-    try {
-      const setResult = this.storage.set<ViewState<ArrayList<Pokemon>>>("pokeListState",ViewState.loading);
-      console.log("setResult-" + setResult);
-    } catch (e) {
-      console.error(e)
-    }
-  }
-
-  private callPokemonsFromServer() {
-   // Each HttpRequest corresponds to an HttpRequestTask object and cannot be reused.
+  getPokeInfo(poke: Pokemon) {
+    // Each HttpRequest corresponds to an HttpRequestTask object and cannot be reused.
     const httpRequest = http.createHttp();
 
     // Subscribe to the HTTP response header, which is returned earlier than HttpRequest. You can subscribe to HTTP Response Header events based on service requirements.
@@ -86,7 +58,7 @@ export class PokeListViewModel {
       console.info('header: ' + JSON.stringify(header));
     });
 
-    const callback = async (err: Error, data: http.HttpResponse)  => {
+    const callback = async (err: Error, data: http.HttpResponse) => {
       if (!err) {
         // data.result contains the HTTP response. Parse the response based on service requirements.
         console.info('Result:' + data.result);
@@ -95,9 +67,90 @@ export class PokeListViewModel {
         console.info('header:' + JSON.stringify(data.header));
         console.info('cookies:' + data.cookies); // 8+
         const json: string = data.result as string
-        const pokeArray: PokemonResponse = JSON.parse(json)
-        await this.savePokemonsToDb(pokeArray.results)
-        await this.get()
+        const pokeInfo: PokemonInfoResponse = JSON.parse(json)
+        try {
+          poke.picUrl = PokeInfo.getFrontSprite(pokeInfo.sprites)
+        } catch (e) {
+          console.error(e)
+        }
+        await this.updateData(poke)
+        await this.getAll().then((pokeList) => {
+          this.setContent(pokeList)
+        })
+      } else {
+        this.setError(err)
+        console.info('error:' + JSON.stringify(err));
+        // Call the destroy() method to release resources after the call is complete.
+        httpRequest.destroy();
+      }
+    }
+    httpRequest.request(
+      // Set the URL of the HTTP request. You need to define the URL. Set the parameters of the request in extraData.
+      poke.url,
+      {
+        method: http.RequestMethod.GET, // Optional. The default value is http.RequestMethod.GET.
+        // You can add the header field based on service requirements.
+        header: {
+          'Content-Type': 'application/json'
+        },
+        // This field is used to transfer data when the POST request is used.
+        extraData: {
+          "data": "data to send",
+        },
+        connectTimeout: 60000, // Optional. The default value is 60000, in ms.
+        readTimeout: 60000, // Optional. The default value is 60000, in ms.
+      }, callback
+    )
+  }
+
+  private setContent(c: ArrayList<Pokemon>) {
+    try {
+      const setResult = this.storage.set<ViewState<ArrayList<Pokemon>>>("pokeListState", ViewState.content(c));
+      console.log("setResult-" + setResult);
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  private setError(e) {
+    try {
+      const setResult = this.storage.set<ViewState<ArrayList<Pokemon>>>("pokeListState", ViewState.error(e));
+      console.log("setResult-" + setResult);
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  private setLoading() {
+    try {
+      const setResult = this.storage.set<ViewState<ArrayList<Pokemon>>>("pokeListState", ViewState.loading);
+      console.log("setResult-" + setResult);
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  private callPokemonsFromServer() {
+    // Each HttpRequest corresponds to an HttpRequestTask object and cannot be reused.
+    const httpRequest = http.createHttp();
+
+    // Subscribe to the HTTP response header, which is returned earlier than HttpRequest. You can subscribe to HTTP Response Header events based on service requirements.
+    // on('headerReceive', AsyncCallback) will be replaced by on('headersReceive', Callback) in API version 8. 8+
+    httpRequest.on('headersReceive', (header) => {
+      console.info('header: ' + JSON.stringify(header));
+    });
+
+    const callback = async (err: Error, data: http.HttpResponse) => {
+      if (!err) {
+        // data.result contains the HTTP response. Parse the response based on service requirements.
+        console.info('Result:' + data.result);
+        console.info('code:' + data.responseCode);
+        // data.header contains the HTTP response header. Parse the content based on service requirements.
+        console.info('header:' + JSON.stringify(data.header));
+        console.info('cookies:' + data.cookies); // 8+
+        const json: string = data.result as string
+        const pokemonResponse: PokemonResponse = JSON.parse(json)
+        await this.savePokemonsToDb(pokemonResponse.results)
       } else {
         this.setError(err)
         console.info('error:' + JSON.stringify(err));
@@ -182,8 +235,7 @@ export class PokeListViewModel {
         return generateBucket(poke)
       })
       await this.insertAll(backets)
-      const pokeList = await this.get()
-      this.setContent(pokeList)
+      this.setContent(await this.getAll())
     } catch (e) {
       this.setError(e)
       console.error(e)
@@ -193,7 +245,7 @@ export class PokeListViewModel {
     this.cancelSuspendDelay();
   }
 
-  async insertAll(pokemons : relationalStore.ValuesBucket[]) {
+  async insertAll(pokemons: relationalStore.ValuesBucket[]) {
     // Use a transaction to insert data.
     try {
       store.beginTransaction();
@@ -224,7 +276,7 @@ export class PokeListViewModel {
     )
   }
 
-  async get(): Promise<ArrayList<Pokemon>> {
+  async getAll(): Promise<ArrayList<Pokemon>> {
     try {
       console.info(this.LOG_TAG + "get")
       await this.count()
@@ -232,13 +284,18 @@ export class PokeListViewModel {
       const promisequery = store.query(predicates, POKE_TABLE.columns);
       const pokemons = new ArrayList<Pokemon>()
       return await promisequery.then((resultSet) => {
-        resultSet.goToFirstRow();
         while (!resultSet.isAtLastRow) {
           resultSet.goToNextRow()
           const id = resultSet.getLong(resultSet.getColumnIndex("id"));
           const name = resultSet.getString(resultSet.getColumnIndex("name"));
           const url = resultSet.getString(resultSet.getColumnIndex("url"));
-          pokemons.add({ id, name, url })
+          let picUrl = ""
+          try {
+            picUrl = resultSet.getString(resultSet.getColumnIndex("picUrl"));
+          }
+          catch (e) {
+          }
+          pokemons.add({ id, name, url, picUrl })
         }
         resultSet.close();
         return pokemons;
@@ -251,6 +308,16 @@ export class PokeListViewModel {
     }
   }
 
+  async updateData(poke: Pokemon) {
+    let predicates = new relationalStore.RdbPredicates(POKE_TABLE.tableName);
+    predicates.equalTo('id', poke.id);
+    const bucket = generateBucket(poke)
+    await store.update(bucket, predicates).catch(
+      (e) => {
+        console.error(e)
+      }
+    )
+  }
 
   async sleep(msec: number): Promise<number> {
     return new Promise<number>(resolve => setTimeout(resolve, msec));

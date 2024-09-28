@@ -24,9 +24,7 @@ struct PokeListPage {
     if (ViewState.isLoading(this.state)) {
 
     }  else if (ViewState.isContent(this.state)) {
-        this.state.value.forEach((poke)=>{
-          this.data.pushData(poke)
-        })
+          this.data.addAllData(this.state.value)
     }
   }
 
@@ -58,8 +56,20 @@ struct PokeListPage {
                     center: { anchor: '__container__', align: VerticalAlign.Center },
                     middle: { anchor: '__container__', align: HorizontalAlign.Center }
                   })
-              }.onAppear(() => {
+                if (item.picUrl.length != 0) {
+                  Image(item.picUrl)
+                    .height(150)
+                    .objectFit(ImageFit.Fill)
+                } else {
+                  Progress({ value: 0, total: 100, type: ProgressType.Ring })
+                    .width(20)
+                    .value(this.progressVal)
+                }
+              }
+              .height(150)
+              .onAppear(() => {
                 console.info("draw-" + item.name)
+                pokeListViewModel.getPokeInfo(item)
               })
             }
           }, (item, index) => index + JSON.stringify(item));
@@ -166,6 +176,15 @@ class PokeDataSource extends BasicDataSource {
 
   public pushData(data: Pokemon): void {
     this.dataArray.push(data);
+    this.notifyDataReload()
     this.notifyDataAdd(this.dataArray.length - 1);
+  }
+
+  public addAllData(array: Array<Pokemon>): void {
+    this.dataArray.splice(0, this.dataArray.length)
+    array.forEach((data) => {
+      this.dataArray.push(data);
+    })
+    this.notifyDataReload()
   }
 }
