@@ -9,6 +9,7 @@ import { PokemonResponse } from '../../model/PokemonResponse';
 import ArrayList from '@ohos.util.ArrayList';
 import { ViewState } from '../../common/State';
 import { PokeInfo, PokemonInfoResponse } from '../../model/PokemonInfoResponse';
+import { PokeListState } from './PokeListState';
 
 export class PokeListViewModel {
   constructor(storage: LocalStorage) {
@@ -19,6 +20,7 @@ export class PokeListViewModel {
   storage: LocalStorage
   id: number = 1; // ID of the suspension delay request.
   delayTime: number = 5000; // Remaining duration for the suspension delay request.
+  lastPokemons: ArrayList<Pokemon> = new ArrayList()
 
   async getPokemons() {
     this.setLoading()
@@ -103,11 +105,14 @@ export class PokeListViewModel {
     )
   }
 
-  private setContent(c: ArrayList<Pokemon>) {
+  private setContent(pokemons: ArrayList<Pokemon>) {
     try {
-      const setResult = this.storage.set<ViewState<ArrayList<Pokemon>>>("pokeListState", ViewState.content(c));
+      const state: PokeListState = { lastPokemons: this.lastPokemons, pokemonToUpdate: pokemons }
+      const setResult = this.storage.set<ViewState<PokeListState>>("pokeListState", ViewState.content(state));
+      this.lastPokemons = pokemons.clone()
       console.log("setResult-" + setResult);
     } catch (e) {
+      this.setError(e)
       console.error(e)
     }
   }
@@ -160,7 +165,7 @@ export class PokeListViewModel {
     }
     httpRequest.request(
       // Set the URL of the HTTP request. You need to define the URL. Set the parameters of the request in extraData.
-      "https://pokeapi.co/api/v2/pokemon?limit=100000&offset=0",
+      "https://pokeapi.co/api/v2/pokemon?limit=2000&offset=0",
       {
         method: http.RequestMethod.GET, // Optional. The default value is http.RequestMethod.GET.
         // You can add the header field based on service requirements.
@@ -232,6 +237,7 @@ export class PokeListViewModel {
     // Execute the time-consuming task.
     try {
       const backets: Array<relationalStore.ValuesBucket> = pokemons.map(poke => {
+        poke.time = new Date().getTime()
         return generateBucket(poke)
       })
       await this.insertAll(backets)
@@ -289,13 +295,20 @@ export class PokeListViewModel {
           const id = resultSet.getLong(resultSet.getColumnIndex("id"));
           const name = resultSet.getString(resultSet.getColumnIndex("name"));
           const url = resultSet.getString(resultSet.getColumnIndex("url"));
+          const time = resultSet.getLong(resultSet.getColumnIndex("time"));
           let picUrl = ""
           try {
             picUrl = resultSet.getString(resultSet.getColumnIndex("picUrl"));
           }
           catch (e) {
           }
-          pokemons.add({ id, name, url, picUrl })
+          pokemons.add({
+            id,
+            name,
+            url,
+            picUrl,
+            time
+          })
         }
         resultSet.close();
         return pokemons;
@@ -311,6 +324,7 @@ export class PokeListViewModel {
   async updateData(poke: Pokemon) {
     let predicates = new relationalStore.RdbPredicates(POKE_TABLE.tableName);
     predicates.equalTo('id', poke.id);
+    poke.time = new Date().getTime()
     const bucket = generateBucket(poke)
     await store.update(bucket, predicates).catch(
       (e) => {

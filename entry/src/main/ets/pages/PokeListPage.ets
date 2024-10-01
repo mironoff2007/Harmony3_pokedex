@@ -1,7 +1,8 @@
 import { ViewState } from '../common/State';
 import { Pokemon } from '../model/Pokemon';
 import { PokeListViewModel } from '../viewmodel/pokelist/PokeListViewModel';
-import Curves from '@ohos.curves'
+import { PokeListState } from '../viewmodel/pokelist/PokeListState';
+import ArrayList from '@ohos.util.ArrayList';
 
 let storage: LocalStorage = new LocalStorage();
 const pokeListViewModel: PokeListViewModel = new PokeListViewModel(storage)
@@ -16,15 +17,25 @@ struct PokeListPage {
 
   @LocalStorageProp('pokeListState')
   @Watch('onStateChange')
-  state: ViewState<Array<Pokemon>> = ViewState.loading;
+  state: ViewState<PokeListState> = ViewState.loading;
+  @State
+  lastState: ArrayList<Pokemon> =  new ArrayList<Pokemon>()
   private data: PokeDataSource = new PokeDataSource();
 
   // @Watch callback
   onStateChange(): void {
     if (ViewState.isLoading(this.state)) {
 
-    }  else if (ViewState.isContent(this.state)) {
-          this.data.addAllData(this.state.value)
+    } else if (ViewState.isContent(this.state)) {
+      if (this.state.value.lastPokemons.length == 0) {
+        this.data.addAllData(this.state.value.pokemonToUpdate.clone())
+      } else {
+        let id = 0
+        this.state.value.pokemonToUpdate.forEach((poke) => {
+          this.data.updateData(id, poke)
+          id++
+        })
+      }
     }
   }
 
@@ -50,15 +61,11 @@ struct PokeListPage {
             ListItem() {
               Row() {
                 Text(item.name)
-                  .fontSize(30)
+                  .fontSize(40)
                   .fontWeight(FontWeight.Bold)
-                  .alignRules({
-                    center: { anchor: '__container__', align: VerticalAlign.Center },
-                    middle: { anchor: '__container__', align: HorizontalAlign.Center }
-                  })
                 if (item.picUrl.length != 0) {
                   Image(item.picUrl)
-                    .height(150)
+                    .height(120)
                     .objectFit(ImageFit.Fill)
                 } else {
                   Progress({ value: 0, total: 100, type: ProgressType.Ring })
@@ -66,12 +73,21 @@ struct PokeListPage {
                     .value(this.progressVal)
                 }
               }
-              .height(150)
+              .alignItems(VerticalAlign.Center)
+              .justifyContent(FlexAlign.Center)
+              .height(120)
+              .width('100%')
               .onAppear(() => {
                 console.info("draw-" + item.name)
-                pokeListViewModel.getPokeInfo(item)
+                if (item.picUrl == "") {
+                  pokeListViewModel.getPokeInfo(item)
+                }
               })
             }
+            .width('100%')
+            .onClick(()=>{
+              console.info("click poke-" + item.name)
+            })
           }, (item, index) => index + JSON.stringify(item));
         }
         .width('100%')
@@ -169,18 +185,12 @@ class PokeDataSource extends BasicDataSource {
     return this.dataArray[index];
   }
 
-  public addData(index: number, data: Pokemon): void {
-    this.dataArray.splice(index, 0, data);
-    this.notifyDataAdd(index);
+  public updateData(index: number, data: Pokemon): void {
+    this.dataArray.splice(index, 1, data)
+    this.notifyDataChange(index);
   }
 
-  public pushData(data: Pokemon): void {
-    this.dataArray.push(data);
-    this.notifyDataReload()
-    this.notifyDataAdd(this.dataArray.length - 1);
-  }
-
-  public addAllData(array: Array<Pokemon>): void {
+  public addAllData(array: ArrayList<Pokemon>): void {
     this.dataArray.splice(0, this.dataArray.length)
     array.forEach((data) => {
       this.dataArray.push(data);

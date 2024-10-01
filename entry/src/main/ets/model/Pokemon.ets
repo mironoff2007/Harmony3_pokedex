@@ -6,6 +6,7 @@ export class Pokemon {
   name: string;
   url: string;
   picUrl: string;
+  time: number
 }
 
 export function generateBucket(poke: Pokemon): relationalStore.ValuesBucket {
