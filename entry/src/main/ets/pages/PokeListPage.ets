@@ -3,6 +3,9 @@ import { Pokemon } from '../model/Pokemon';
 import { PokeListViewModel } from '../viewmodel/pokelist/PokeListViewModel';
 import { PokeListState } from '../viewmodel/pokelist/PokeListState';
 import ArrayList from '@ohos.util.ArrayList';
+import { RouteConstants } from './RouteConstants';
+import router from '@ohos.router';
+import { PokeDetailParams } from '../viewmodel/pokedetail/PokeDetailParams';
 
 let storage: LocalStorage = new LocalStorage();
 const pokeListViewModel: PokeListViewModel = new PokeListViewModel(storage)
@@ -18,8 +21,6 @@ struct PokeListPage {
   @LocalStorageProp('pokeListState')
   @Watch('onStateChange')
   state: ViewState<PokeListState> = ViewState.loading;
-  @State
-  lastState: ArrayList<Pokemon> =  new ArrayList<Pokemon>()
   private data: PokeDataSource = new PokeDataSource();
 
   // @Watch callback
@@ -87,6 +88,8 @@ struct PokeListPage {
             .width('100%')
             .onClick(()=>{
               console.info("click poke-" + item.name)
+              const params: PokeDetailParams = { name: item.name }
+              router.pushUrl({ url: RouteConstants.POKE_DETAILS, params: params })
             })
           }, (item, index) => index + JSON.stringify(item));
         }
