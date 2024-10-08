@@ -3,5 +3,5 @@ import { Pokemon } from '../../model/Pokemon'
 
 export type PokeListState = {
   lastPokemons: ArrayList<Pokemon>
-  pokemonToUpdate: ArrayList<Pokemon>
+  pokemonToUpdate: Pokemon
 }

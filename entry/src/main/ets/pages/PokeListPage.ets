@@ -21,6 +21,11 @@ struct PokeListPage {
   @LocalStorageProp('pokeListState')
   @Watch('onStateChange')
   state: ViewState<PokeListState> = ViewState.loading;
+
+  @LocalStorageProp('pokeUpdate')
+  @Watch('onPokeUpdate')
+  updatePokemon: Pokemon = null;
+
   private data: PokeDataSource = new PokeDataSource();
 
   // @Watch callback
@@ -28,15 +33,14 @@ struct PokeListPage {
     if (ViewState.isLoading(this.state)) {
 
     } else if (ViewState.isContent(this.state)) {
-      if (this.state.value.lastPokemons.length == 0) {
-        this.data.addAllData(this.state.value.pokemonToUpdate.clone())
-      } else {
-        let id = 0
-        this.state.value.pokemonToUpdate.forEach((poke) => {
-          this.data.updateData(id, poke)
-          id++
-        })
-      }
+        this.data.addAllData(this.state.value.lastPokemons)
+    }
+  }
+
+  // @Watch callback
+  onPokeUpdate(): void {
+    if (this.updatePokemon != null) {
+      this.data.updateData(this.updatePokemon.id, this.updatePokemon)
     }
   }
 
@@ -93,7 +97,11 @@ struct PokeListPage {
             })
           }, (item, index) => index + JSON.stringify(item));
         }
+        .onAppear(()=>{
+          pokeListViewModel.logAppear()
+        })
         .width('100%')
+        .height('100%')
         .divider({
           strokeWidth: '0.5vp',
           color: '#0D000000'
@@ -188,9 +196,16 @@ class PokeDataSource extends BasicDataSource {
     return this.dataArray[index];
   }
 
+  public updateRangeData(data: ArrayList<Pokemon>): void {
+    data.forEach((poke) => {
+      this.updateData(poke.id, poke)
+    })
+  }
+
   public updateData(index: number, data: Pokemon): void {
-    this.dataArray.splice(index, 1, data)
-    this.notifyDataChange(index);
+      console.debug("update-" + data.name)
+      this.dataArray.splice(index, 1, data)
+      this.notifyDataChange(index);
   }
 
   public addAllData(array: ArrayList<Pokemon>): void {

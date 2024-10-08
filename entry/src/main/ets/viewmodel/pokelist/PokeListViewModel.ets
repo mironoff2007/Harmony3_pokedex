@@ -10,6 +10,7 @@ import ArrayList from '@ohos.util.ArrayList';
 import { ViewState } from '../../common/State';
 import { PokeInfo, PokemonInfoResponse } from '../../model/PokemonInfoResponse';
 import { PokeListState } from './PokeListState';
+import { PokeListDiffUtil } from './PokeListDiffUtil';
 
 export class PokeListViewModel {
   constructor(storage: LocalStorage) {
@@ -21,6 +22,12 @@ export class PokeListViewModel {
   id: number = 1; // ID of the suspension delay request.
   delayTime: number = 5000; // Remaining duration for the suspension delay request.
   lastPokemons: ArrayList<Pokemon> = new ArrayList()
+  updatePokemons: ArrayList<Pokemon> = new ArrayList()
+  counter: number = 0
+
+  logAppear() {
+    console.info(this.LOG_TAG +'Appear pokelist')
+  }
 
   async getPokemons() {
     this.setLoading()
@@ -38,9 +45,8 @@ export class PokeListViewModel {
 
     if (await this.count() != 0) {
       console.info(this.LOG_TAG + "load from db")
-      this.getAll().then((pokeList) => {
-        this.setContent(pokeList)
-      })
+      const pokeList = await this.getAll()
+      this.setContent(pokeList)
     } else {
       console.info(this.LOG_TAG + "load from server")
       this.callPokemonsFromServer()
@@ -50,10 +56,34 @@ export class PokeListViewModel {
     this.cancelSuspendDelay();
   }
 
+  async updatePoke(json: string, poke: Pokemon) {
+    // Before executing a time-consuming task, call the API to request a transient task to delay the suspension.
+    this.requestSuspendDelay();
+
+    // If required, obtain the available time quota through the getRemainingDelayTime() API.
+    await this.getRemainingDelayTime();
+
+    if (this.delayTime < 0) { // If the time is less than a certain value, cancel the time-consuming task.
+      // Handle the scenario where the time quota is insufficient.
+      this.cancelSuspendDelay();
+      return;
+    }
+    const pokeInfo: PokemonInfoResponse = JSON.parse(json)
+    try {
+      poke.picUrl = PokeInfo.getFrontSprite(pokeInfo.sprites)
+    } catch (e) {
+      console.error(e)
+    }
+    await this.updateData(poke)
+    this.updateContent(poke)
+
+    this.cancelSuspendDelay();
+  }
+
   getPokeInfo(poke: Pokemon) {
     // Each HttpRequest corresponds to an HttpRequestTask object and cannot be reused.
     const httpRequest = http.createHttp();
-
+    console.info(this.LOG_TAG +'call http-'+ poke.name) ;
     // Subscribe to the HTTP response header, which is returned earlier than HttpRequest. You can subscribe to HTTP Response Header events based on service requirements.
     // on('headerReceive', AsyncCallback) will be replaced by on('headersReceive', Callback) in API version 8. 8+
     httpRequest.on('headersReceive', (header) => {
@@ -62,22 +92,17 @@ export class PokeListViewModel {
 
     const callback = async (err: Error, data: http.HttpResponse) => {
       if (!err) {
+        console.info(this.LOG_TAG +'call http end-'+ poke.name) ;
         // data.result contains the HTTP response. Parse the response based on service requirements.
-        console.info('Result:' + data.result);
+        console.info(this.LOG_TAG +'Result:' + data.result);
         console.info('code:' + data.responseCode);
         // data.header contains the HTTP response header. Parse the content based on service requirements.
         console.info('header:' + JSON.stringify(data.header));
         console.info('cookies:' + data.cookies); // 8+
         const json: string = data.result as string
-        const pokeInfo: PokemonInfoResponse = JSON.parse(json)
-        try {
-          poke.picUrl = PokeInfo.getFrontSprite(pokeInfo.sprites)
-        } catch (e) {
-          console.error(e)
-        }
-        await this.updateData(poke)
-        await this.getAll().then((pokeList) => {
-          this.setContent(pokeList)
+
+        return new Promise((resolve, reject) => {
+          this.updatePoke(json, poke)
         })
       } else {
         this.setError(err)
@@ -106,10 +131,30 @@ export class PokeListViewModel {
   }
 
   private setContent(pokemons: ArrayList<Pokemon>) {
+    console.info(this.LOG_TAG + "setContent");
     try {
-      const state: PokeListState = { lastPokemons: this.lastPokemons, pokemonToUpdate: pokemons }
-      const setResult = this.storage.set<ViewState<PokeListState>>("pokeListState", ViewState.content(state));
-      this.lastPokemons = pokemons.clone()
+      let counter = 0
+      pokemons.forEach((poke) => {
+        poke.id = counter
+        counter++
+      }
+      )
+      let setResult = false
+      const state: PokeListState = { lastPokemons: pokemons, pokemonToUpdate: null }
+      setResult = this.storage.set<ViewState<PokeListState>>("pokeListState", ViewState.content(state));
+      this.updatePokemons.clear()
+      console.log("setResult-" + setResult);
+    } catch (e) {
+      this.setError(e)
+      console.error(e)
+    }
+  }
+
+  private async updateContent(pokemon: Pokemon) {
+    console.info(this.LOG_TAG + "updateContent");
+    try {
+      let setResult = false
+      setResult = this.storage.set<Pokemon>("pokeUpdate", pokemon);
       console.log("setResult-" + setResult);
     } catch (e) {
       this.setError(e)
@@ -255,10 +300,8 @@ export class PokeListViewModel {
     // Use a transaction to insert data.
     try {
       store.beginTransaction();
-      let promise = store.batchInsert(POKE_TABLE.tableName, pokemons)
-      await promise.then(() => {
-        store.commit();
-      })
+      await store.batchInsert(POKE_TABLE.tableName, pokemons)
+      store.commit();
     } catch (err) {
       this.setError(err)
       if ((err instanceof Error)) {
@@ -273,13 +316,11 @@ export class PokeListViewModel {
 
   async count(): Promise<number> {
     const q = 'SELECT COUNT(*) FROM ' + POKE_TABLE.tableName
-    return await store.querySql(q, []).then((resultSet) => {
-      resultSet.goToFirstRow();
-      const count = resultSet.getLong(0);
-      console.info(this.LOG_TAG + "poke count-" + count)
-      return count
-    }
-    )
+    const resultSet = await store.querySql(q, [])
+    resultSet.goToFirstRow();
+    const count = resultSet.getLong(0);
+    console.info(this.LOG_TAG + "poke count-" + count)
+    return count
   }
 
   async getAll(): Promise<ArrayList<Pokemon>> {
@@ -287,32 +328,30 @@ export class PokeListViewModel {
       console.info(this.LOG_TAG + "get")
       await this.count()
       const predicates = new relationalStore.RdbPredicates(POKE_TABLE.tableName);
-      const promisequery = store.query(predicates, POKE_TABLE.columns);
+      const resultSet = await store.query(predicates, POKE_TABLE.columns);
       const pokemons = new ArrayList<Pokemon>()
-      return await promisequery.then((resultSet) => {
-        while (!resultSet.isAtLastRow) {
-          resultSet.goToNextRow()
-          const id = resultSet.getLong(resultSet.getColumnIndex("id"));
-          const name = resultSet.getString(resultSet.getColumnIndex("name"));
-          const url = resultSet.getString(resultSet.getColumnIndex("url"));
-          const time = resultSet.getLong(resultSet.getColumnIndex("time"));
-          let picUrl = ""
-          try {
-            picUrl = resultSet.getString(resultSet.getColumnIndex("picUrl"));
-          }
-          catch (e) {
-          }
-          pokemons.add({
-            id,
-            name,
-            url,
-            picUrl,
-            time
-          })
+      while (!resultSet.isAtLastRow) {
+        resultSet.goToNextRow()
+        const id = resultSet.getLong(resultSet.getColumnIndex("id"));
+        const name = resultSet.getString(resultSet.getColumnIndex("name"));
+        const url = resultSet.getString(resultSet.getColumnIndex("url"));
+        const time = resultSet.getLong(resultSet.getColumnIndex("time"));
+        let picUrl = ""
+        try {
+          picUrl = resultSet.getString(resultSet.getColumnIndex("picUrl"));
         }
-        resultSet.close();
-        return pokemons;
-      })
+        catch (e) {
+        }
+        pokemons.add({
+          id,
+          name,
+          url,
+          picUrl,
+          time
+        })
+      }
+      resultSet.close();
+      return pokemons;
     }
     catch (err) {
       this.setError(err)
@@ -321,8 +360,8 @@ export class PokeListViewModel {
     }
   }
 
-  async updateData(poke: Pokemon) {
-    let predicates = new relationalStore.RdbPredicates(POKE_TABLE.tableName);
+async updateData(poke: Pokemon) {
+  let predicates = new relationalStore.RdbPredicates(POKE_TABLE.tableName);
     predicates.equalTo('id', poke.id);
     poke.time = new Date().getTime()
     const bucket = generateBucket(poke)
