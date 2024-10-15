@@ -4,6 +4,7 @@ import { store } from '../../db/RDB';
 import { POKE_TABLE } from '../../db/PokeTable';
 import { PokeDetailState } from './PokeDetailState';
 import { ViewState } from '../../common/State';
+import { PokeRepo } from '../../db/PokeRepo';
 
 export class PokeDetailViewModel {
   constructor(storage: LocalStorage) {
@@ -14,6 +15,8 @@ export class PokeDetailViewModel {
   storage: LocalStorage
   id: number = 1; // ID of the suspension delay request.
   delayTime: number = 5000; // Remaining duration for the suspension delay request.
+
+  pokeRepo = new PokeRepo();
 
   private setError(e) {
     try {
@@ -77,7 +80,7 @@ export class PokeDetailViewModel {
 
     // Execute the time-consuming task.
     try {
-      const poke = await this.getByName(name)
+      const poke = await this.pokeRepo.getByName(name)
       const setResult = this.storage.set<ViewState<PokeDetailState>>("pokeDetailState", ViewState.content({pokemon: poke}));
       console.log("setResult-" + setResult);
     } catch (e) {
@@ -92,30 +95,4 @@ export class PokeDetailViewModel {
     this.cancelSuspendDelay();
   }
 
-  async getByName(name: string) {
-    let predicates = new relationalStore.RdbPredicates(POKE_TABLE.tableName);
-    predicates.equalTo('name', name);
-    const promisequery = store.query(predicates, POKE_TABLE.columns);
-    return await promisequery.then((resultSet) => {
-      resultSet.goToFirstRow()
-      const id = resultSet.getLong(resultSet.getColumnIndex("id"));
-      const name = resultSet.getString(resultSet.getColumnIndex("name"));
-      const url = resultSet.getString(resultSet.getColumnIndex("url"));
-      const time = resultSet.getLong(resultSet.getColumnIndex("time"));
-      let picUrl = ""
-      try {
-        picUrl = resultSet.getString(resultSet.getColumnIndex("picUrl"));
-      }
-      catch (e) {
-      }
-      resultSet.close();
-      return {
-        id,
-        name,
-        url,
-        picUrl,
-        time
-      };
-    })
-  }
 }

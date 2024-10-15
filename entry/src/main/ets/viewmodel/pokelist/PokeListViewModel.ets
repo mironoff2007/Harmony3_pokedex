@@ -10,6 +10,8 @@ import ArrayList from '@ohos.util.ArrayList';
 import { ViewState } from '../../common/State';
 import { PokeInfo, PokemonInfoResponse } from '../../model/PokemonInfoResponse';
 import { PokeListState } from './PokeListState';
+import { PokeRepo } from '../../db/PokeRepo';
+import { BusinessError } from '../../common/AsyncCallback';
 
 export class PokeListViewModel {
   constructor(storage: LocalStorage) {
@@ -23,10 +25,7 @@ export class PokeListViewModel {
   lastPokemons: ArrayList<Pokemon> = new ArrayList()
   updatePokemons: ArrayList<Pokemon> = new ArrayList()
   counter: number = 0
-
-  logAppear() {
-    console.info(this.LOG_TAG +'Appear pokelist')
-  }
+  pokeRepo = new PokeRepo();
 
   async getPokemons() {
     this.setLoading()
@@ -42,13 +41,18 @@ export class PokeListViewModel {
       return;
     }
 
-    if (await this.count() != 0) {
-      console.info(this.LOG_TAG + "load from db")
-      const pokeList = await this.getAll()
-      this.setContent(pokeList)
-    } else {
-      console.info(this.LOG_TAG + "load from server")
-      this.callPokemonsFromServer()
+    try {
+      if (await this.pokeRepo.count() != 0) {
+        console.info(this.LOG_TAG + "load from db")
+        const pokeList = await this.pokeRepo.getAll()
+        this.setContent(pokeList)
+      } else {
+        console.info(this.LOG_TAG + "load from server")
+        this.callPokemonsFromServer()
+      }
+    } catch (e) {
+      this.setError(e)
+      console.error(this.LOG_TAG + `error get: ${e}`);
     }
 
     // After the time-consuming task is executed, call the API to cancel the transient task.
@@ -73,60 +77,23 @@ export class PokeListViewModel {
     } catch (e) {
       console.error(e)
     }
-    await this.updateData(poke)
+    await this.pokeRepo.updateData(poke)
     this.updateContent(poke)
 
     this.cancelSuspendDelay();
   }
 
   getPokeInfo(poke: Pokemon) {
-    // Each HttpRequest corresponds to an HttpRequestTask object and cannot be reused.
-    const httpRequest = http.createHttp();
-    console.info(this.LOG_TAG +'call http-'+ poke.name) ;
-    // Subscribe to the HTTP response header, which is returned earlier than HttpRequest. You can subscribe to HTTP Response Header events based on service requirements.
-    // on('headerReceive', AsyncCallback) will be replaced by on('headersReceive', Callback) in API version 8. 8+
-    httpRequest.on('headersReceive', (header) => {
-      console.info('header: ' + JSON.stringify(header));
-    });
-
-    const callback = async (err: Error, data: http.HttpResponse) => {
-      if (!err) {
-        console.info(this.LOG_TAG +'call http end-'+ poke.name) ;
-        // data.result contains the HTTP response. Parse the response based on service requirements.
-        console.info(this.LOG_TAG +'Result:' + data.result);
-        console.info('code:' + data.responseCode);
-        // data.header contains the HTTP response header. Parse the content based on service requirements.
-        console.info('header:' + JSON.stringify(data.header));
-        console.info('cookies:' + data.cookies); // 8+
-        const json: string = data.result as string
-
+    const callback = async (err: BusinessError<Error>, json: string ) => {
+      if (json != null) {
         return new Promise((resolve, reject) => {
           this.updatePoke(json, poke)
         })
       } else {
-        this.setError(err)
-        console.info('error:' + JSON.stringify(err));
-        // Call the destroy() method to release resources after the call is complete.
-        httpRequest.destroy();
+
       }
     }
-    httpRequest.request(
-      // Set the URL of the HTTP request. You need to define the URL. Set the parameters of the request in extraData.
-      poke.url,
-      {
-        method: http.RequestMethod.GET, // Optional. The default value is http.RequestMethod.GET.
-        // You can add the header field based on service requirements.
-        header: {
-          'Content-Type': 'application/json'
-        },
-        // This field is used to transfer data when the POST request is used.
-        extraData: {
-          "data": "data to send",
-        },
-        connectTimeout: 60000, // Optional. The default value is 60000, in ms.
-        readTimeout: 60000, // Optional. The default value is 60000, in ms.
-      }, callback
-    )
+    this.pokeRepo.getPokeInfo(poke, callback)
   }
 
   private setContent(pokemons: ArrayList<Pokemon>) {
@@ -180,50 +147,17 @@ export class PokeListViewModel {
   }
 
   private callPokemonsFromServer() {
-    // Each HttpRequest corresponds to an HttpRequestTask object and cannot be reused.
-    const httpRequest = http.createHttp();
-
-    // Subscribe to the HTTP response header, which is returned earlier than HttpRequest. You can subscribe to HTTP Response Header events based on service requirements.
-    // on('headerReceive', AsyncCallback) will be replaced by on('headersReceive', Callback) in API version 8. 8+
-    httpRequest.on('headersReceive', (header) => {
-      console.info('header: ' + JSON.stringify(header));
-    });
-
-    const callback = async (err: Error, data: http.HttpResponse) => {
-      if (!err) {
-        // data.result contains the HTTP response. Parse the response based on service requirements.
-        console.info('Result:' + data.result);
-        console.info('code:' + data.responseCode);
-        // data.header contains the HTTP response header. Parse the content based on service requirements.
-        console.info('header:' + JSON.stringify(data.header));
-        console.info('cookies:' + data.cookies); // 8+
-        const json: string = data.result as string
+    const callback = async (err: BusinessError<Error>, json: string ) => {
+      if (json != null) {
         const pokemonResponse: PokemonResponse = JSON.parse(json)
-        await this.savePokemonsToDb(pokemonResponse.results)
+        return new Promise((resolve, reject) => {
+          this.savePokemonsToDb(pokemonResponse.results)
+        })
       } else {
         this.setError(err)
-        console.info('error:' + JSON.stringify(err));
-        // Call the destroy() method to release resources after the call is complete.
-        httpRequest.destroy();
       }
     }
-    httpRequest.request(
-      // Set the URL of the HTTP request. You need to define the URL. Set the parameters of the request in extraData.
-      "https://pokeapi.co/api/v2/pokemon?limit=2000&offset=0",
-      {
-        method: http.RequestMethod.GET, // Optional. The default value is http.RequestMethod.GET.
-        // You can add the header field based on service requirements.
-        header: {
-          'Content-Type': 'application/json'
-        },
-        // This field is used to transfer data when the POST request is used.
-        extraData: {
-          "data": "data to send",
-        },
-        connectTimeout: 60000, // Optional. The default value is 60000, in ms.
-        readTimeout: 60000, // Optional. The default value is 60000, in ms.
-      }, callback
-    )
+    this.pokeRepo.callPokemonsFromServer(callback)
   }
 
   // Request a suspension delay.
@@ -280,12 +214,8 @@ export class PokeListViewModel {
 
     // Execute the time-consuming task.
     try {
-      const backets: Array<relationalStore.ValuesBucket> = pokemons.map(poke => {
-        poke.time = new Date().getTime()
-        return generateBucket(poke)
-      })
-      await this.insertAll(backets)
-      this.setContent(await this.getAll())
+      await this.pokeRepo.insertAll(pokemons)
+      this.setContent(await this.pokeRepo.getAll())
     } catch (e) {
       this.setError(e)
       console.error(e)
@@ -295,83 +225,4 @@ export class PokeListViewModel {
     this.cancelSuspendDelay();
   }
 
-  async insertAll(pokemons: relationalStore.ValuesBucket[]) {
-    // Use a transaction to insert data.
-    try {
-      store.beginTransaction();
-      await store.batchInsert(POKE_TABLE.tableName, pokemons)
-      store.commit();
-    } catch (err) {
-      this.setError(err)
-      if ((err instanceof Error)) {
-        console.error(`Transaction failed, err: ${err.message}`);
-      } else if (err instanceof String) {
-        console.error(`Transaction failed, err: ${err}`);
-      }
-      console.error(`Transaction failed, err: ${err}`);
-      store.rollBack();
-    }
-  }
-
-  async count(): Promise<number> {
-    const q = 'SELECT COUNT(*) FROM ' + POKE_TABLE.tableName
-    const resultSet = await store.querySql(q, [])
-    resultSet.goToFirstRow();
-    const count = resultSet.getLong(0);
-    console.info(this.LOG_TAG + "poke count-" + count)
-    return count
-  }
-
-  async getAll(): Promise<ArrayList<Pokemon>> {
-    try {
-      console.info(this.LOG_TAG + "get")
-      await this.count()
-      const predicates = new relationalStore.RdbPredicates(POKE_TABLE.tableName);
-      const resultSet = await store.query(predicates, POKE_TABLE.columns);
-      const pokemons = new ArrayList<Pokemon>()
-      while (!resultSet.isAtLastRow) {
-        resultSet.goToNextRow()
-        const id = resultSet.getLong(resultSet.getColumnIndex("id"));
-        const name = resultSet.getString(resultSet.getColumnIndex("name"));
-        const url = resultSet.getString(resultSet.getColumnIndex("url"));
-        const time = resultSet.getLong(resultSet.getColumnIndex("time"));
-        let picUrl = ""
-        try {
-          picUrl = resultSet.getString(resultSet.getColumnIndex("picUrl"));
-        }
-        catch (e) {
-        }
-        pokemons.add({
-          id,
-          name,
-          url,
-          picUrl,
-          time
-        })
-      }
-      resultSet.close();
-      return pokemons;
-    }
-    catch (err) {
-      this.setError(err)
-      console.error(this.LOG_TAG + `error get: ${err}`);
-      return null
-    }
-  }
-
-async updateData(poke: Pokemon) {
-  let predicates = new relationalStore.RdbPredicates(POKE_TABLE.tableName);
-    predicates.equalTo('id', poke.id);
-    poke.time = new Date().getTime()
-    const bucket = generateBucket(poke)
-    await store.update(bucket, predicates).catch(
-      (e) => {
-        console.error(e)
-      }
-    )
-  }
-
-  async sleep(msec: number): Promise<number> {
-    return new Promise<number>(resolve => setTimeout(resolve, msec));
-  }
 }

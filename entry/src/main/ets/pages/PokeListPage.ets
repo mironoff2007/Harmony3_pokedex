@@ -97,9 +97,6 @@ struct PokeListPage {
             })
           }, (item, index) => index + JSON.stringify(item));
         }
-        .onAppear(()=>{
-          pokeListViewModel.logAppear()
-        })
         .width('100%')
         .height('100%')
         .divider({
