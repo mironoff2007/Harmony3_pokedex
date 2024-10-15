@@ -33,7 +33,7 @@ struct PokeListPage {
     if (ViewState.isLoading(this.state)) {
 
     } else if (ViewState.isContent(this.state)) {
-        this.listAdapter.addAllData(this.state.value.lastPokemons)
+        this.listAdapter.addAllData(this.state.value.pokemonsList)
     }
   }
 

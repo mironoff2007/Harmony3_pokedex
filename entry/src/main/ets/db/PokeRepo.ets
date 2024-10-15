@@ -141,7 +141,6 @@ export class PokeRepo {
   }
 
   async getAll(): Promise<ArrayList<Pokemon>> {
-      await this.count()
       const predicates = new relationalStore.RdbPredicates(POKE_TABLE.tableName);
       const resultSet = await store.query(predicates, POKE_TABLE.columns);
       const pokemons = new ArrayList<Pokemon>()
@@ -187,9 +186,9 @@ export class PokeRepo {
       return generateBucket(poke)
     })
     // Use a transaction to insert data.
-      store.beginTransaction();
-      await store.batchInsert(POKE_TABLE.tableName, backets)
-      store.commit();
+    store.beginTransaction();
+    await store.batchInsert(POKE_TABLE.tableName, backets)
+    store.commit();
   }
 
 }

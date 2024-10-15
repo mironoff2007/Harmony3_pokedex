@@ -5,14 +5,11 @@ import { POKE_TABLE } from '../../db/PokeTable';
 import { PokeDetailState } from './PokeDetailState';
 import { ViewState } from '../../common/State';
 import { PokeRepo } from '../../db/PokeRepo';
+import { ViewModel } from '../../common/ViewModel';
 
-export class PokeDetailViewModel {
-  constructor(storage: LocalStorage) {
-    this.storage = storage
-  }
+export class PokeDetailViewModel extends ViewModel {
   LOG_TAG: string = "PokeDetailViewModel-"
 
-  storage: LocalStorage
   id: number = 1; // ID of the suspension delay request.
   delayTime: number = 5000; // Remaining duration for the suspension delay request.
 

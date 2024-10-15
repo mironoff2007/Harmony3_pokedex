@@ -12,19 +12,14 @@ import { PokeInfo, PokemonInfoResponse } from '../../model/PokemonInfoResponse';
 import { PokeListState } from './PokeListState';
 import { PokeRepo } from '../../db/PokeRepo';
 import { BusinessError } from '../../common/AsyncCallback';
+import { ViewModel } from '../../common/ViewModel';
 
-export class PokeListViewModel {
-  constructor(storage: LocalStorage) {
-    this.storage = storage
-  }
+export class PokeListViewModel extends ViewModel {
 
   LOG_TAG: string = "PokeListViewModel-"
-  storage: LocalStorage
   id: number = 1; // ID of the suspension delay request.
   delayTime: number = 5000; // Remaining duration for the suspension delay request.
-  lastPokemons: ArrayList<Pokemon> = new ArrayList()
-  updatePokemons: ArrayList<Pokemon> = new ArrayList()
-  counter: number = 0
+
   pokeRepo = new PokeRepo();
 
   async getPokemons() {
@@ -106,9 +101,8 @@ export class PokeListViewModel {
       }
       )
       let setResult = false
-      const state: PokeListState = { lastPokemons: pokemons, pokemonToUpdate: null }
+      const state: PokeListState = { pokemonsList: pokemons }
       setResult = this.storage.set<ViewState<PokeListState>>("pokeListState", ViewState.content(state));
-      this.updatePokemons.clear()
       console.log("setResult-" + setResult);
     } catch (e) {
       this.setError(e)
