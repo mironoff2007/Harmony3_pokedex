@@ -2,10 +2,10 @@ import { ViewState } from '../common/State';
 import { Pokemon } from '../model/Pokemon';
 import { PokeListViewModel } from '../viewmodel/pokelist/PokeListViewModel';
 import { PokeListState } from '../viewmodel/pokelist/PokeListState';
-import ArrayList from '@ohos.util.ArrayList';
 import { RouteConstants } from './RouteConstants';
 import router from '@ohos.router';
 import { PokeDetailParams } from '../viewmodel/pokedetail/PokeDetailParams';
+import { PokeListAdapter } from '../viewmodel/pokelist/PokeListAdapter';
 
 let storage: LocalStorage = new LocalStorage();
 const pokeListViewModel: PokeListViewModel = new PokeListViewModel(storage)
@@ -26,21 +26,21 @@ struct PokeListPage {
   @Watch('onPokeUpdate')
   updatePokemon: Pokemon = null;
 
-  private data: PokeDataSource = new PokeDataSource();
+  private listAdapter: PokeListAdapter = new PokeListAdapter();
 
   // @Watch callback
   onStateChange(): void {
     if (ViewState.isLoading(this.state)) {
 
     } else if (ViewState.isContent(this.state)) {
-        this.data.addAllData(this.state.value.lastPokemons)
+        this.listAdapter.addAllData(this.state.value.lastPokemons)
     }
   }
 
   // @Watch callback
   onPokeUpdate(): void {
     if (this.updatePokemon != null) {
-      this.data.updateData(this.updatePokemon.id, this.updatePokemon)
+      this.listAdapter.updateData(this.updatePokemon.id, this.updatePokemon)
     }
   }
 
@@ -62,7 +62,7 @@ struct PokeListPage {
     } else if (ViewState.isContent(this.state)) {
       Stack() {
         List() {
-          LazyForEach(this.data, (item: Pokemon) => {
+          LazyForEach(this.listAdapter, (item: Pokemon) => {
             ListItem() {
               Row() {
                 Text(item.name)
@@ -116,103 +116,5 @@ struct PokeListPage {
     } else {
 
     }
-  }
-}
-
-// Basic implementation of IDataSource to handle data listener
-class BasicDataSource implements IDataSource {
-  private listeners: DataChangeListener[] = [];
-  private originDataArray: Pokemon[] = [];
-
-  public totalCount(): number {
-    return 0;
-  }
-
-  public getData(index: number): Pokemon {
-    return this.originDataArray[index];
-  }
-
-  // This method is called by the framework to add a listener to the LazyForEach data source.
-  registerDataChangeListener(listener: DataChangeListener): void {
-    if (this.listeners.indexOf(listener) < 0) {
-      console.info('add listener');
-      this.listeners.push(listener);
-    }
-  }
-
-  // This method is called by the framework to remove the listener from the LazyForEach data source.
-  unregisterDataChangeListener(listener: DataChangeListener): void {
-    const pos = this.listeners.indexOf(listener);
-    if (pos >= 0) {
-      console.info('remove listener');
-      this.listeners.splice(pos, 1);
-    }
-  }
-
-  // Notify LazyForEach that all child components need to be reloaded.
-  notifyDataReload(): void {
-    this.listeners.forEach(listener => {
-      listener.onDataReloaded();
-    })
-  }
-
-  // Notify LazyForEach that a child component needs to be added for the data item with the specified index.
-  notifyDataAdd(index: number): void {
-    this.listeners.forEach(listener => {
-      listener.onDataAdd(index);
-    })
-  }
-
-  // Notify LazyForEach that the data item with the specified index has changed and the child component needs to be rebuilt.
-  notifyDataChange(index: number): void {
-    this.listeners.forEach(listener => {
-      listener.onDataChange(index);
-    })
-  }
-
-  // Notify LazyForEach that the child component that matches the specified index needs to be deleted.
-  notifyDataDelete(index: number): void {
-    this.listeners.forEach(listener => {
-      listener.onDataDelete(index);
-    })
-  }
-
-  // Notify LazyForEach that data needs to be swapped between the from and to positions.
-  notifyDataMove(from: number, to: number): void {
-    this.listeners.forEach(listener => {
-      listener.onDataMove(from, to);
-    })
-  }
-}
-
-class PokeDataSource extends BasicDataSource {
-  private dataArray: Pokemon[] = [];
-
-  public totalCount(): number {
-    return this.dataArray.length;
-  }
-
-  public getData(index: number): Pokemon {
-    return this.dataArray[index];
-  }
-
-  public updateRangeData(data: ArrayList<Pokemon>): void {
-    data.forEach((poke) => {
-      this.updateData(poke.id, poke)
-    })
-  }
-
-  public updateData(index: number, data: Pokemon): void {
-      console.debug("update-" + data.name)
-      this.dataArray.splice(index, 1, data)
-      this.notifyDataChange(index);
-  }
-
-  public addAllData(array: ArrayList<Pokemon>): void {
-    this.dataArray.splice(0, this.dataArray.length)
-    array.forEach((data) => {
-      this.dataArray.push(data);
-    })
-    this.notifyDataReload()
   }
 }

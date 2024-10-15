@@ -10,7 +10,6 @@ import ArrayList from '@ohos.util.ArrayList';
 import { ViewState } from '../../common/State';
 import { PokeInfo, PokemonInfoResponse } from '../../model/PokemonInfoResponse';
 import { PokeListState } from './PokeListState';
-import { PokeListDiffUtil } from './PokeListDiffUtil';
 
 export class PokeListViewModel {
   constructor(storage: LocalStorage) {
