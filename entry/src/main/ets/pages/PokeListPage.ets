@@ -64,37 +64,43 @@ struct PokeListPage {
         List() {
           LazyForEach(this.listAdapter, (item: Pokemon) => {
             ListItem() {
-              Row() {
-                Text(item.name)
-                  .fontSize(40)
-                  .fontWeight(FontWeight.Bold)
-                if (item.picUrl.length != 0) {
+              if (item.picUrl.length != 0) {
+                Row() {
+                  Text(item.name)
+                    .fontSize(40)
+                    .fontWeight(FontWeight.Bold)
                   Image(item.picUrl)
                     .height(120)
                     .objectFit(ImageFit.Fill)
-                } else {
+                }
+                .alignItems(VerticalAlign.Center)
+                .justifyContent(FlexAlign.Center)
+                .onClick(()=>{
+                  console.info("click poke-" + item.name)
+                  const params: PokeDetailParams = { name: item.name }
+                  router.pushUrl({ url: RouteConstants.POKE_DETAILS, params: params })
+                })
+              } else {
+                Row() {
+                  Text(item.name)
+                    .fontSize(40)
+                    .fontWeight(FontWeight.Bold)
                   Progress({ value: 0, total: 100, type: ProgressType.Ring })
                     .width(20)
                     .value(this.progressVal)
                 }
+                .alignItems(VerticalAlign.Center)
+                .justifyContent(FlexAlign.Center)
+                .onAppear(() => {
+                  console.info("draw-" + item.name)
+                  if (item.picUrl == "") {
+                    pokeListViewModel.getPokeInfo(item)
+                  }
+                })
               }
-              .alignItems(VerticalAlign.Center)
-              .justifyContent(FlexAlign.Center)
-              .height(120)
-              .width('100%')
-              .onAppear(() => {
-                console.info("draw-" + item.name)
-                if (item.picUrl == "") {
-                  pokeListViewModel.getPokeInfo(item)
-                }
-              })
             }
+            .height(120)
             .width('100%')
-            .onClick(()=>{
-              console.info("click poke-" + item.name)
-              const params: PokeDetailParams = { name: item.name }
-              router.pushUrl({ url: RouteConstants.POKE_DETAILS, params: params })
-            })
           }, (item, index) => index + JSON.stringify(item));
         }
         .width('100%')
