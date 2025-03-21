@@ -49,9 +49,6 @@ export class PokeRepo {
           'Content-Type': 'application/json'
         },
         // This field is used to transfer data when the POST request is used.
-        extraData: {
-          "data": "data to send",
-        },
         connectTimeout: 60000, // Optional. The default value is 60000, in ms.
         readTimeout: 60000, // Optional. The default value is 60000, in ms.
       }, callback
@@ -95,9 +92,6 @@ export class PokeRepo {
           'Content-Type': 'application/json'
         },
         // This field is used to transfer data when the POST request is used.
-        extraData: {
-          "data": "data to send",
-        },
         connectTimeout: 60000, // Optional. The default value is 60000, in ms.
         readTimeout: 60000, // Optional. The default value is 60000, in ms.
       }, callback
